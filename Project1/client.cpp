@@ -1,82 +1,159 @@
-#include <stdio.h>
-#include <stdlib.h>
+//Authors: Joshua Moore and Rojal 
+//Program Description: 
+//Compiler used: Vscode with g++
+
+
+#include <iostream>
+#include <sys/types.h>   // defines types (like size_t)
+#include <sys/socket.h>  // defines socket class
+#include <netinet/in.h>  // defines port numbers for (internet) sockets, some address structures, and constants
+#include <netdb.h> 
+#include <iostream>
+#include <fstream>
+#include <arpa/inet.h>   // if you want to use inet_addr() function
 #include <string.h>
 #include <unistd.h>
-#include <arpa/inet.h>
-#define SIZE 1024
+#include <fstream> // for files
 
-
-
-void send_file_data(FILE *fp, int sockfd, struct sockaddr_in addr){
-  int n;
-  char buffer[SIZE];
+//file stream for data transfer
+// ofstream myfile;
 
 
 
 
+using namespace std;
 
-  // Sending the data
-  while(fgets(buffer, SIZE, fp) != NULL){
-    printf("[SENDING] Data: %s", buffer);
 
-    n = sendto(sockfd, buffer, SIZE, 0, (struct sockaddr*)&addr, sizeof(addr));
-    if (n == -1){
-      perror("[ERROR] sending data to the server.");
-      exit(1);
+int main(int argc, char *argv[]){
+  
+  struct hostent *s; 
+ 
+  //take command line argument 1 for server address
+  s = gethostbyname(argv[1]);
+  
+  struct sockaddr_in server;
+  int mysocket = 0;
+  socklen_t slen = sizeof(server);
+  char payload[512]="1248"; 
+ 
+  
+  //create UDP socket to the server
+  if ((mysocket=socket(AF_INET, SOCK_DGRAM, 0))==-1)
+    cout << "Error in creating socket.\n";
+
+  
+  memset((char *) &server, 0, sizeof(server));
+  server.sin_family = AF_INET;
+  server.sin_port = htons(7123);
+  bcopy((char *)s->h_addr, 
+	(char *)&server.sin_addr.s_addr,
+	s->h_length);
+ 
+  // obtained from https://stackoverflow.com/questions/32737083/extracting-ip-data-using-gethostbyname                                         
+  struct in_addr a;
+  printf("name: %s\n", s->h_name);
+  while (*s->h_aliases)
+      printf("alias: %s\n", *s->h_aliases++);
+  while (*s->h_addr_list)
+  {
+      bcopy(*s->h_addr_list++, (char *) &a, sizeof(a));
+      printf("address: %s\n", inet_ntoa(a));
+  }
+
+  
+
+    
+    if (sendto(mysocket, payload, 8, 0, (struct sockaddr *)&server, slen)==-1)
+      cout << "Error in sendto function.\n";
+  
+
+  char portnum[512];
+   recvfrom(mysocket, portnum, 512, 0, (struct sockaddr *)&server, &slen); 
+ 
+
+
+
+
+  
+ 
+
+
+  close(mysocket);
+
+
+
+
+
+
+
+//file transfer phase
+
+string filename = argv[2];
+//setup file stream
+ofstream filename;
+//open the file
+filename.open(filename);
+
+//parse for newline character in file
+
+
+
+struct sockaddr_in server;
+  int mysocket = 0;
+  socklen_t slen = sizeof(server);
+
+
+  string line;
+  ifstream myfile ("in.txt");
+  if (myfile.is_open())
+  { int i=0;
+    while ( getline (myfile,line) )
+    
+    {
+      line=payload+i[8]
+      i++;
     }
-    bzero(buffer, SIZE);
-
+    myfile.close();
   }
 
-  // Sending the 'END'
-  strcpy(buffer, "END");
-  sendto(sockfd, buffer, SIZE, 0, (struct sockaddr*)&addr, sizeof(addr));
+  else cout << "Unable to open file"; 
+   
+ 
+  
+  //create UDP socket to the server
+  if ((mysocket=socket(AF_INET, SOCK_DGRAM, 0))==-1)
+    cout << "Error in creating socket.\n";
 
-  fclose(fp);
-  return;
-}
+  
+  memset((char *) &server, 0, sizeof(server));
+  server.sin_family = AF_INET;
+  server.sin_port = htons(portnum);
+  bcopy((char *)s->h_addr, 
+	(char *)&server.sin_addr.s_addr,
+	s->h_length);
 
-int main(int argc,char* argv[]){
 
 
-if(argc <3){
 
-  exit(EXIT_FAILURE);
-}
 
-  // Defining the IP and Port
-  char *ip = "127.0.0.1";
-  int port = 8080;
 
-  // Defining variables
-  int server_sockfd;
-  struct sockaddr_in server_addr;
-  FILE *fp;
-  char *filename = "client.txt";
+//send data
 
-  // Creating a UDP socket
-  server_sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-  if (server_sockfd < 0){
-    perror("[ERROR] socket error");
-    exit(1);
-  }
-  server_addr.sin_family = AF_INET;
-  server_addr.sin_port = port;
-  server_addr.sin_addr.s_addr = inet_addr(ip);
+      if (sendto(mysocket, payload, 8, 0, (struct sockaddr *)&server, slen)==-1)
+      cout << "Error in sendto function.\n";
+  
+  
+  char  ack[512];
+  recvfrom(mysocket, ack, 512, 0, (struct sockaddr *)&server, &slen); 
+  cout << ack << endl;
 
-  // Reading the text file
-  fp = fopen(filename, "r");
-  if (fp == NULL){
-    perror("[ERROR] reading the file");
-    exit(1);
-  }
+  //char *k = inet_ntoa(server.sin_addr);
+  //printf("IP address: %s\n", k);
 
-  // Sending the file data to the server
-  send_file_data(fp, server_sockfd, server_addr);
 
-  printf("[SUCCESS] Data transfer complete.\n");
-  printf("[CLOSING] Disconnecting from the server.\n");
 
-  close(server_sockfd);
+
+  close(mysocket);
+
   return 0;
 }

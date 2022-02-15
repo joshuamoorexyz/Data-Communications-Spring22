@@ -1,82 +1,135 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
+//Authors: Joshua Moore and Rojal 
+//Program Description: 
+//Compiler used: Vscode with g++
+
+
+
+
+#include <iostream>
+#include <sys/types.h>   // defines types (like size_t)
+#include <sys/socket.h>  // defines socket class
+#include <netinet/in.h>  // defines port numbers for (internet) sockets, some address structures, and constants
+#include <time.h>        // used for random number generation
+#include <string.h> // using this to convert random port integer to string
 #include <arpa/inet.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <time.h>
+#include <fstream>
 
-#define SIZE 1024
 
-void write_file(int sockfd, struct sockaddr_in addr){
-  FILE *fp;
-  char *filename = "server.txt";
-  int n;
-  char buffer[SIZE];
-  socklen_t addr_size;
+using namespace std;
 
-  // Creating a file.
-  fp = fopen(filename, "w");
 
-  // Receiving the data and writing it into the file.
-  while(1){
 
-    addr_size = sizeof(addr);
-    n = recvfrom(sockfd, buffer, SIZE, 0, (struct sockaddr*)&addr, &addr_size);
 
-    if (strcmp(buffer, "END") == 0){
+//file stream for data transfer
+ofstream myfile;
+
+
+
+int main(int argc, char *argv[]){
+  
+
+
+  char portnum[8];
+  struct sockaddr_in server;
+  struct sockaddr_in client;
+  int mysocket = 0;
+  int i = 0;
+  socklen_t clen = sizeof(client);
+  char payload[512];
+  
+  if ((mysocket=socket(AF_INET, SOCK_DGRAM, 0))==-1)
+    cout << "Error in socket creation.\n";
+  
+ 
+
+
+  memset((char *) &server, 0, sizeof(server));
+  server.sin_family = AF_INET;
+  server.sin_port = htons(7123);
+  server.sin_addr.s_addr = htonl(INADDR_ANY);
+  if (bind(mysocket, (struct sockaddr *)&server, sizeof(server)) == -1)
+    cout << "Error in binding.\n";
+  
+
+  for (i=0; i<5; i++) {
+    cout << "I'm waiting on a request for a port number.\n";
+    if (recvfrom(mysocket, payload, 512, 0, (struct sockaddr *)&client, &clen)==-1)
+      cout << "Failed to receive.\n";
       break;
-      return;
-    }
-
-    printf("[RECEVING] Data: %s", buffer);
-    fprintf(fp, "%s", buffer);
-    bzero(buffer, SIZE);
+    //generate random port number between 1024 and 65535
+  /* initialize random seed: */
+  
 
   }
+srand (time(NULL));
+  
+  int randnum = rand() % 65535 + 1024; 
+  //convert integer to char 
+  sprintf(portnum, "%d", randnum);
 
-  fclose(fp);
-  return;
-}
 
-int main(int argc,char* argv[]){
+cout<<"Random port chosen:" << portnum;
 
-if(argc <1){
-
-  exit(EXIT_FAILURE);
-}
-
-  // Defining the IP and Port
-  char *ip = "127.0.0.1";
-  int port = 8080;
-
-  // Defining variables
-  int server_sockfd;
-  struct sockaddr_in server_addr, client_addr;
-  char buffer[SIZE];
-  int e;
-
-  // Creating a UDP socket
-  server_sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-  if (server_sockfd < 0){
-    perror("[ERROR] socket error");
-    exit(1);
+if (sendto(mysocket, portnum, 64, 0, (struct sockaddr *)&client, clen)==-1){
+    cout << "Error in sendto function.\n";
   }
-  server_addr.sin_family = AF_INET;
-  server_addr.sin_port = port;
-  server_addr.sin_addr.s_addr = inet_addr(ip);
+ close(mysocket);
 
-  e = bind(server_sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr));
-  if (e < 0){
-    perror("[ERROR] bind error");
-    exit(1);
-  }
 
-  printf("[STARTING] UDP File Server started. \n");
-  write_file(server_sockfd, client_addr);
 
-  printf("[SUCCESS] Data transfer complete.\n");
-  printf("[CLOSING] Closing the server.\n");
 
-  close(server_sockfd);
 
+
+
+
+
+  // char ack[]="Got all that data, thanks!";
+  // if (sendto(mysocket, ack, 64, 0, (struct sockaddr *)&client, clen)==-1){
+  //   cout << "Error in sendto function.\n";
+  // }
+     
+  // close(mysocket);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//send data phase
+
+
+
+
+
+
+
+
+
+
+  // for (i=0; i<5; i++) {
+  //   cout << "I'm waiting for a packet now.\n";
+  //   if (recvfrom(mysocket, payload, 512, 0, (struct sockaddr *)&client, &clen)==-1)
+  //     cout << "Failed to receive.\n";
+  //   cout << "Received data: " << payload << endl;
+  // }
+  
+  // char ack[]="Got all that data, thanks!";
+  // if (sendto(mysocket, ack, 64, 0, (struct sockaddr *)&client, clen)==-1){
+  //   cout << "Error in sendto function.\n";
+  // }
+     
+  // close(mysocket);
   return 0;
 }
