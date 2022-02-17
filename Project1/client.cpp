@@ -1,6 +1,12 @@
 //Authors: Joshua Moore and Rojal 
-//Program Description: 
+//Josh NetID: jjm702
+//Rojal NetID:
 //Compiler used: Vscode with g++
+
+
+//--------sources-----------
+// c++ files https://www.cplusplus.com/reference/cstdio/FILE/
+// Slides from class and example given
 
 
 #include <iostream>
@@ -14,146 +20,143 @@
 #include <string.h>
 #include <unistd.h>
 #include <fstream> // for files
-
-//file stream for data transfer
-// ofstream myfile;
-
-
+#include <chrono>
+#include <thread>
+#include <ctime>
 
 
 using namespace std;
-
-
-int main(int argc, char *argv[]){
-  
-  struct hostent *s; 
- 
-  //take command line argument 1 for server address
-  s = gethostbyname(argv[1]);
-  
-  struct sockaddr_in server;
-  int mysocket = 0;
-  socklen_t slen = sizeof(server);
-  char payload[512]="1248"; 
- 
-  
-  //create UDP socket to the server
-  if ((mysocket=socket(AF_INET, SOCK_DGRAM, 0))==-1)
-    cout << "Error in creating socket.\n";
-
-  
-  memset((char *) &server, 0, sizeof(server));
-  server.sin_family = AF_INET;
-  server.sin_port = htons(7123);
-  bcopy((char *)s->h_addr, 
-	(char *)&server.sin_addr.s_addr,
-	s->h_length);
- 
-  // obtained from https://stackoverflow.com/questions/32737083/extracting-ip-data-using-gethostbyname                                         
-  struct in_addr a;
-  printf("name: %s\n", s->h_name);
-  while (*s->h_aliases)
-      printf("alias: %s\n", *s->h_aliases++);
-  while (*s->h_addr_list)
-  {
-      bcopy(*s->h_addr_list++, (char *) &a, sizeof(a));
-      printf("address: %s\n", inet_ntoa(a));
-  }
-
   
 
-    
-    if (sendto(mysocket, payload, 8, 0, (struct sockaddr *)&server, slen)==-1)
-      cout << "Error in sendto function.\n";
-  
-
-  char portnum[512];
-   recvfrom(mysocket, portnum, 512, 0, (struct sockaddr *)&server, &slen); 
- 
 
 
+//start of main function
+int main(int argc, char const *argv[])
+{
+	
+	
+	//----------------------handshake phase---------------------------------------------------
 
 
-  
- 
+	struct hostent *s;
+
+	//get hostname
+	s = gethostbyname(argv[1]); //take command line argument for host address
+
+	//create socket for handshake phase
+	struct sockaddr_in server;
+	memset((char*)&server, 0, sizeof(server));
+	server.sin_family = AF_INET; //ipv4
+	server.sin_port = htons(atoi(argv[2])); //take command line argument and convert to int
+	bcopy((char*)s->h_addr, (char*)&server.sin_addr.s_addr, s->h_length);
+	socklen_t slen = sizeof(server);
+	int sock = 0;
+
+	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+	{
+		cout<<"Error creating socket";
+		return -1;
+	}
 
 
-  close(mysocket);
+//bind to socket
+
+ bind(sock, (struct sockaddr *)&server, sizeof(server));
+
+ //connect to socket
+
+	if ((connect(sock, (struct sockaddr*)&server, slen)) == -1)
+	{
+		
+		return -1;
+	}
 
 
+//payload to initiate transfer
+	char payload[256]="1248";
+	memset(payload, 0, 256);
+	sprintf(payload, "%d", 259);
 
+	if ((send(sock, payload, 256, 0))<0)
+	{
+		cout<<"Error sending data";
+		return -1;
+	}
 
-
-
-
-//file transfer phase
-
-string filename = argv[2];
-//setup file stream
-ofstream filename;
-//open the file
-filename.open(filename);
-
-//parse for newline character in file
-
-
-
-struct sockaddr_in server;
-  int mysocket = 0;
-  socklen_t slen = sizeof(server);
-
-
-  string line;
-  ifstream myfile ("in.txt");
-  if (myfile.is_open())
-  { int i=0;
-    while ( getline (myfile,line) )
-    
-    {
-      line=payload+i[8]
-      i++;
-    }
-    myfile.close();
-  }
-
-  else cout << "Unable to open file"; 
-   
- 
-  
-  //create UDP socket to the server
-  if ((mysocket=socket(AF_INET, SOCK_DGRAM, 0))==-1)
-    cout << "Error in creating socket.\n";
-
-  
-  memset((char *) &server, 0, sizeof(server));
-  server.sin_family = AF_INET;
-  server.sin_port = htons(portnum);
-  bcopy((char *)s->h_addr, 
-	(char *)&server.sin_addr.s_addr,
-	s->h_length);
+//get random port from the server
+	char randPort[256];
+	memset(randPort, 0, 256);
+	int sock1 = 0;
+	sock1 = socket(AF_INET, SOCK_STREAM, 0);
+	int bytesRead = read(sock, randPort, 5);
+	close(sock);
 
 
 
 
 
+	//----------------------transfer phase---------------------------------------------------
+	//needed data items
+	FILE *data;
+	char *buf;
+	long dataLength;
+	size_t result;
 
-//send data
-
-      if (sendto(mysocket, payload, 8, 0, (struct sockaddr *)&server, slen)==-1)
-      cout << "Error in sendto function.\n";
-  
-  
-  char  ack[512];
-  recvfrom(mysocket, ack, 512, 0, (struct sockaddr *)&server, &slen); 
-  cout << ack << endl;
-
-  //char *k = inet_ntoa(server.sin_addr);
-  //printf("IP address: %s\n", k);
+	//take filename from command line entry
+	const char *myFile = argv[3];
+	int sock2 = 0;
+	if ((sock2 = socket(AF_INET, SOCK_DGRAM, 0)) <0)
+	{
+		cout<<"Error creating data socket";
+		return -1;
+	}
 
 
 
+	//change port to one aggreed upon
+	server.sin_port = htons(atoi(randPort));
 
-  close(mysocket);
 
-  return 0;
+
+	
+	data = fopen(myFile, "r");
+
+	//find end of file
+	fseek(data, 0, SEEK_END);
+	long lSize = ftell(data);
+	rewind(data);
+
+	
+
+
+	for (int i = 0; i<14; i++)
+	{
+		
+		buf = (char*)malloc(4);
+		memset(buf, 0, 5);
+		//read data from file
+		dataLength = fread(buf, 1, 4, data);
+
+	
+
+		if ((sendto(sock2, buf, 4, 0, (struct sockaddr*)&server, slen))<0)
+		{
+			cout<<"Could not send data";
+			return -1;
+		}
+
+		char acknowl[4];
+		memset(acknowl, 0, 8);
+		if ((recvfrom(sock2, acknowl, 4, 0, (struct sockaddr*)&server, &slen))<0)
+		{
+			cout<<"Error in aknowledge";
+			return -1;
+		}
+		cout << acknowl << endl;
+	}
+	
+	//close files and sockets
+	fclose(data);
+	close(sock2);
 }
+

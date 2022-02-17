@@ -1,8 +1,11 @@
 //Authors: Joshua Moore and Rojal 
-//Program Description: 
+//Josh NetID: jjm702
+//Rojal NetID:
 //Compiler used: Vscode with g++
 
-
+//--------sources-----------
+// c++ files https://www.cplusplus.com/reference/cstdio/FILE/
+// Slides from class and example given
 
 
 #include <iostream>
@@ -17,6 +20,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <fstream>
+#include <ctype.h> //for toupper
 
 
 using namespace std;
@@ -24,112 +28,145 @@ using namespace std;
 
 
 
-//file stream for data transfer
-ofstream myfile;
 
-
-
-int main(int argc, char *argv[]){
-  
-
-
-  char portnum[8];
-  struct sockaddr_in server;
-  struct sockaddr_in client;
-  int mysocket = 0;
-  int i = 0;
-  socklen_t clen = sizeof(client);
-  char payload[512];
-  
-  if ((mysocket=socket(AF_INET, SOCK_DGRAM, 0))==-1)
-    cout << "Error in socket creation.\n";
-  
- 
-
-
-  memset((char *) &server, 0, sizeof(server));
-  server.sin_family = AF_INET;
-  server.sin_port = htons(7123);
-  server.sin_addr.s_addr = htonl(INADDR_ANY);
-  if (bind(mysocket, (struct sockaddr *)&server, sizeof(server)) == -1)
-    cout << "Error in binding.\n";
-  
-
-  for (i=0; i<5; i++) {
-    cout << "I'm waiting on a request for a port number.\n";
-    if (recvfrom(mysocket, payload, 512, 0, (struct sockaddr *)&client, &clen)==-1)
-      cout << "Failed to receive.\n";
-      break;
-    //generate random port number between 1024 and 65535
-  /* initialize random seed: */
-  
-
-  }
-srand (time(NULL));
-  
-  int randnum = rand() % 65535 + 1024; 
-  //convert integer to char 
-  sprintf(portnum, "%d", randnum);
-
-
-cout<<"Random port chosen:" << portnum;
-
-if (sendto(mysocket, portnum, 64, 0, (struct sockaddr *)&client, clen)==-1){
-    cout << "Error in sendto function.\n";
-  }
- close(mysocket);
+int main(int argc, char const *argv[])
+{
 
 
 
 
+	//----------------------handshake phase---------------------------------------------------
 
 
 
+	//create socket for initial handshake
+	int server = 0;
+	if ((server = socket(AF_INET, SOCK_STREAM, 0)) < 0)	
+	{
+		cout<<"Error creating socket\n";
+		return -1;
+	}
+
+	struct sockaddr_in serveraddress;
+	memset((char*)&serveraddress, 0, sizeof(serveraddress));	
+	serveraddress.sin_family = AF_INET; //ipv4
+	serveraddress.sin_port = htons(atoi(argv[1]));	//take command line argument and transfer to int
+	serveraddress.sin_addr.s_addr = htons(INADDR_ANY);
+	//bind to this socket
+	if ((bind(server, (struct sockaddr*)&serveraddress, sizeof(serveraddress))) <0)
+	{
+		cout<<"Error binding to address\n";
+		return -1;}
+
+	if((listen(server, 6)) < 0)
+	{
+		cout<<"Error listening on port: ";
+		cout<<argv[1];
+		cout<<"\n";
+		return -1;
+	}
 
 
-  // char ack[]="Got all that data, thanks!";
-  // if (sendto(mysocket, ack, 64, 0, (struct sockaddr *)&client, clen)==-1){
-  //   cout << "Error in sendto function.\n";
-  // }
-     
-  // close(mysocket);
+	struct sockaddr_in clientaddress;
+	socklen_t clen = sizeof(clientaddress);
+	int sock1 = ( accept(server, (struct sockaddr*)&clientaddress, &clen));
 
 
 
+	char package[256];	
+	memset(package,0,256);
+	if((read(sock1,package,5)) < 0)
+	{
+		cout<<"unable to get data";
+		return -1;
+	}
+
+	//generate random number in range for port num
+	srand((unsigned)time(0)); 
+    int randNo = (rand()%65536)+1024;
 
 
 
+	char r_port[256];
+	memset(r_port,0,256);
 
 
+	//convert to int
+	sprintf(r_port,"%d",randNo);
+    cout<< "random port chosen: "<<r_port<<endl;
 
 
+	 //share with client
 
-
-
-
-//send data phase
+    if ((send(sock1, r_port, 256, 0)) < 0)
+	{
+		cout<<"Could not transfer to client";
+		return -1;
+	}
+	//close sockets
+	close(server);
+	close(sock1);
 
 
 
 
 
+	//----------------------transfer phase---------------------------------------------------
+
+	//create socket for transfer phase
+	int sock = 0;
+	if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
+	{
+		cout<<"Error creating socket\n";
+		return -1;
+	}
+	serveraddress.sin_port = htons(atoi(r_port)); //port is used here for transfer
+
+	//bind to socket
+	if ((bind(sock, (struct sockaddr*)&serveraddress, sizeof(serveraddress))) <0)
+	{
+		cout<<"Unable to bind to socket\n";
+		return -1;
+	}
 
 
+	char payload[4];
+	//recieve file from client in chunks of 4 characters
+	for(int i=0;i<14;i++)
+	{
+		if((recvfrom(sock,payload, 4, 0, (struct sockaddr*)&clientaddress, &clen))<0)
+		{
+			
+			return -1;
+		}
+		
+		
+			char data [4];
 
 
+		//create file to write to
+		FILE *output;
+		
+		strcpy(data, payload);
+		output = fopen("upload.txt", "w");
+		
+			fwrite(data, 4, sizeof(data), output);
+      
+		for (int i=0; i< 10; i++)
+		{
+			payload[i] = toupper(data[i]);
+		}
+		
+		if((sendto(sock, payload, 4,0, (struct sockaddr*)&clientaddress, clen))<0)
+		{
+			cout<<"Aknowledge not sent";
+			return -1;
+		}
+		
+		fclose(output);
+		
+	}
+	
+close(sock);
 
-  // for (i=0; i<5; i++) {
-  //   cout << "I'm waiting for a packet now.\n";
-  //   if (recvfrom(mysocket, payload, 512, 0, (struct sockaddr *)&client, &clen)==-1)
-  //     cout << "Failed to receive.\n";
-  //   cout << "Received data: " << payload << endl;
-  // }
-  
-  // char ack[]="Got all that data, thanks!";
-  // if (sendto(mysocket, ack, 64, 0, (struct sockaddr *)&client, clen)==-1){
-  //   cout << "Error in sendto function.\n";
-  // }
-     
-  // close(mysocket);
-  return 0;
 }
