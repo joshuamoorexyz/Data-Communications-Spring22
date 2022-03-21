@@ -120,63 +120,102 @@ if ((bind(mysocket, (struct sockaddr *)&server, sizeof(server))) < 0) // if bind
 //format for two logs files is one number per line TA will be using this to grade
 
  FILE * clientseqnum.log,clientack.log;
+ FILE * seqFile;
+  long seqSize;
+  char * seqbuffer;
+  size_t seqresult;
+
+
+
+  
 
 /*
-
-
-
-
-
-
-
 
  and send it using ARQ to the server
  https://youtu.be/raZYelgmyb0 good video about ARQ to use
 
 */
+int totalcount=0;
+//keep up with sequence either 0 or 1 to pass to packet
 
-//take data and seperate into char arrays of 30 chars or less
+while(totalcount!=lsize){
+char *tempbuf[30];
+int loopcount=0;
+for(int i=0;i<30;i++){
 
-//also need to keep count to parse buf
-int countforbuf=0;
+  if(buf[totalcount+i]!=0){
+  loopcount+=1;
+  tempbuf[totalcount+i]=buf[toalcount+i];}
+  else{
+    break;
+  }
+
+//check to see if clientseqnum exists if not create it and send packet with 0 seq num first
+  seqFile = fopen ( clientseqnum.log , "rb" );
+  if (seqFile==NULL) {
+
+
+ packet p(1,0,loopcount,tempbuf);
+
+
+  }
+  else{
+  //get last integer written to the file
+ //some psuedocode  
+ //int sequenceinelse=getintlastinfile
+
+ //if(sequenceinelse==0){
+
+   //packet p( has 1 as sequence when sent)
+
+   ...
+   ...
+   ...
+     //create packet and then serialize.
+  
+
+//record sequence number
+
+//send the packet then wait for an ack
+
+//if packet is received deserialize
+
+//record ack or EOT in acklog
+
+
+ //}
+  //else(packet p has 0 as sequnce when sent)
+
+...
+...
+...
+
+  //create packet and then serialize.
+  
+
+//record sequence number
+
+//send packet then wait for an ack from server
+
+//if packet is received deserialize
+
+//record ack or EOT in acklog
+
+  }
 
 
 
-for( int j!=lsize){
 
 
-char *tempbuf=NULL;
 
-
-while(int i=0<30){
-
-//read 30 chars from buf to serialize
-tempbuf[i]=buf[j+countforbuf];
-
-i++;
+  totalcount+=loopcount;
 }
 
-//now that there are 30 in tempbuf create packet
-
-int type= 
-int seqnum=
-int length=
-////get sequence number for packet
-
-
-//if ack packet
-
-
-
-//if data packet
-p.packet(1,0,)
-
-
-
-countforbuf+30;
-j++;
-
 }
+
+//send EOT packet to server
+
+
 
 
 
