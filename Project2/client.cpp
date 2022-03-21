@@ -32,7 +32,7 @@ using namespace std;
 
 
 int main(int argc, char *argv[]){
-
+packet p;
   int packetLen=50;
   struct hostent *emulatorName; 
 //get command line input from the user
@@ -90,101 +90,146 @@ if ((bind(mysocket, (struct sockaddr *)&server, sizeof(server))) < 0) // if bind
   }
 
 
-//open file to read from
-ofstream myFile;
-myFile.open(fileName);
-if(myFile.is_open()){
-  perror("open error");
+
+//taken from https://www.cplusplus.com/reference/cstdio/fread/
+//open file to read from (These files should be overwritten every runtime)
+ FILE * pFile;
+  long lSize;
+  char * buffer;
+  size_t result;
+
+  pFile = fopen ( fileName , "rb" );
+  if (pFile==NULL) {fputs ("File error",stderr); exit (1);}
+
+  // obtain file size:
+  fseek (pFile , 0 , SEEK_END);
+  lSize = ftell (pFile);
+  rewind (pFile);
+
+  // allocate memory to contain the whole file:
+  buffer = (char*) malloc (sizeof(char)*lSize);
+  if (buffer == NULL) {fputs ("Memory error",stderr); exit (2);}
+
+  // copy the file into the buffer:
+  result = fread (buffer,1,lSize,pFile);
+  if (result != lSize) {fputs ("Reading error",stderr); exit (3);}
+
+  /* the whole file is now loaded in the memory buffer. */
+
+ 
+//format for two logs files is one number per line TA will be using this to grade
+
+ FILE * clientseqnum.log,clientack.log;
+
+/*
+
+
+
+
+
+
+
+
+ and send it using ARQ to the server
+ https://youtu.be/raZYelgmyb0 good video about ARQ to use
+
+*/
+
+//take data and seperate into char arrays of 30 chars or less
+
+//also need to keep count to parse buf
+int countforbuf=0;
+
+
+
+for( int j!=lsize){
+
+
+char *tempbuf=NULL;
+
+
+while(int i=0<30){
+
+//read 30 chars from buf to serialize
+tempbuf[i]=buf[j+countforbuf];
+
+i++;
 }
 
-//file for acks
-ofstream ackFile;
-ackFile.open("arrival.log");
-if(ackFile.is_open()){
-  perror("open error ackfile");
+//now that there are 30 in tempbuf create packet
+
+int type= 
+int seqnum=
+int length=
+////get sequence number for packet
+
+
+//if ack packet
+
+
+
+//if data packet
+p.packet(1,0,)
+
+
+
+countforbuf+30;
+j++;
 
 }
 
 
-char receiveData[37]; // to receive from packet
-  char charData[30];    // character in the packet
-  char ackData[42];     // to send ack data to client
 
-  int type = 1;
-  int seqnum = 0;
-  int acktype = 0;
-  int expectseq = 0;
+/*
 
-  packet filepacket(type, seqnum, sizeof(charData), charData);
 
-  while (1)
-  {
-    memset(receiveData, 0, sizeof(receiveData));
-    memset(charData, 0, sizeof(charData));
-    memset(ackData, 0, sizeof(ackData));
+after all contents of the file have been transmitted successfully
+to the server and corresponding ACKs have been received, the client should send an
+EOT packet to the server.  The EOT packet is in the same format
+ (and it has a sequence number) as a regular data packet, except that its type 
+ field is set to 3,its length is set to zero,and the data is set to null
 
-    // error in receiving from client
-    if (recvfrom(mysocket, receiveData, sizeof(receiveData), 0, (struct sockaddr *)&server, &slen) == -1)
-    {
-      perror("Receiving\n");
-      return -1;
-    }
+ To ensure reliable transmission your program should implement ARQ like:
 
-    filepacket.deserialize((char *)receiveData); // deserialize to see sent data
-    type = filepacket.getType();                 //get Type
-    seqnum = filepacket.getSeqNum();
+ The sequence numbers used will be 0 and 1.The first sequence number used is 0,
+ then 1,then 0,then 1,etc.
 
-    ackFile << seqnum << "\n";
-    printf("\n--------------------------------------\n");
-    filepacket.printContents();
+ Once the client sends a packet,it waits for an ACK with the corresponding sequence number
 
-    printf("\nExpecting Rn: %d\n", expectseq);
-    printf("sn: %d\n", seqnum);
+ A timer of 2 seconds is used to recover from packet loss. When the timer expires,
+ the client resends the outstanding packet.If there is no outstanding packet,the timer is stopped
 
-    if (expectseq == seqnum) //  if expected sequence matches sequence number from client file
-    {
+ <heading>Interrupting the Timer</heading>
 
-      if (filepacket.getType() == 3) // if type sent by client is 3 then do EOT
-      {
+ The recvfrom() call will cause the client to block until a packet
+ is received. This may cause problems from the corectness of your program unless
+ you interrupt the recvfrom() call.
 
-        acktype = 2; // set acktype to 2
-        packet ackpacket(acktype, seqnum, 0, 0);
-        ackpacket.serialize(ackData); //searialize to send data
-        if (sendto(mysocket, ackData, sizeof(ackData), 0, (struct sockaddr *)&sendToEmulator, sizeof(sendToEmulator)) == -1)
-        {
-          perror("Sending Error");
-          return -1;
-        }
-        ackpacket.printContents(); //print sent data
-        printf("--------------------------------------\n");
-        break; // exit
-      }
+ For ex: imagine the case where the last packet from the client is sent and the client then calls
+ recvfrom() to obtain the acknowledgement that should be returned from the server.
+ However,assume that this last packet from the client is lost in transit. No acknowledgement will be 
+ transmitted back from the server. The client, who is now waiting to 
+ receive an ack, will block forever.
 
-      myFile << filepacket.getData(); // write to the file
+ You must interrupt the blocking call to check whether the timer has expired. It is up to you
+ to decide how to do this. i recommend setsockopt() and using the option SO_RCVTIMEO
 
-      packet ackpacket(acktype, seqnum, 0, 0); // send only acktype and seq number
-      ackpacket.serialize((char *)ackData);    // searilize to send data in the socket
-      //send ack to server
-      if (sendto(mysocket, ackData, sizeof(ackData), 0, (struct sockaddr *)&sendToEmulator, sizeof(sendToEmulator)) == -1)
-      {
-        printf("Sending Error\n");
-        return -1;
-      }
+ (remember to reference source)
 
-      ackpacket.printContents();
-      expectseq = (expectseq + 1) % 8;
-    }
-    else // if sequence number doesnot resend the ack to the server
-    {
-      packet ackpacket(acktype, expectseq, 0, 0);
-      ackpacket.serialize((char *)ackData);
-      sendto(mysocket, ackData, sizeof(ackData), 0, (struct sockaddr *)&sendToEmulator, sizeof(sendToEmulator));
-      ackpacket.printContents();
-      printf("-------------------------------------\n");
-    }
-  }
+ **Whenever a packet is sent,its sequence number should be recorded in "clientseqnum.log" this includes the EOT packet sent 
+ by the client
 
-  myFile.close(); //close the file
+
+ The file "clientack.log" should record the sequence numbers of all the ACK packets and the EOT packet
+ (from the server) that the client receives during the entire period of transmission.
+
+ 
+
+*/
+
+  // terminate
+  fclose (pFile);
+  free (buffer);
 
   close(mysocket); // close the socket
 
@@ -192,40 +237,4 @@ char receiveData[37]; // to receive from packet
 
 
   	  
-//   // now going to send serialize and send 3 packets
-//   char payloadA[512]="123"; // payload data
 
-//   char payloadB[512]="abcd"; // another payload
-
-  
-//   char spacketA[packetLen];  // for holding serialized packet  
-//   memset(spacketA, 0, packetLen); // serialize the packet to be sent
-
-//   char spacketB[packetLen];
-//   memset(spacketB, 0, packetLen);
-
-//   char spacketC[packetLen];
-//   memset(spacketC, 0, packetLen);
-  
-//   packet mySendPacket(1, 101, strlen(payloadA), payloadA); // make the packet to be serialized and sent
-
-//   packet mySendPacketB(1, 201, strlen(payloadB), payloadB);
-  
-//   mySendPacket.serialize(spacketA); // serialize so spacket contains serialized contents of mySendPacket's payload
-//   cout << "Sending serialized packet with payload:" << payloadA << endl;
-//   cout << "This is what the serialized packet looks like: " << spacketA << endl;
-//   sendto(mysocket, spacketA, 50, 0, (struct sockaddr *)&server, slen);
-
-//   mySendPacketB.serialize(spacketB);
-//   cout << "Sending serialized packet with payloadB:" << payloadB << endl;
-//   cout << "This is what the serialized packet looks like: " << spacketB << endl;
-//   sendto(mysocket, spacketB, 50, 0, (struct sockaddr *)&server, slen);
-
-
-
-// //close file
-// myFile.close();
-//   //close socket
-//   close(mysocket);
-//   return 0;
-// }
