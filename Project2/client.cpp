@@ -32,8 +32,9 @@ using namespace std;
 
 
 int main(int argc, char *argv[]){
-packet p;
-  int packetLen=50;
+int bufsize;
+
+
   struct hostent *emulatorName; 
 //get command line input from the user
 
@@ -104,10 +105,13 @@ if ((bind(mysocket, (struct sockaddr *)&server, sizeof(server))) < 0) // if bind
   // obtain file size:
   fseek (pFile , 0 , SEEK_END);
   lSize = ftell (pFile);
+  bufsize=lSize;
   rewind (pFile);
 
   // allocate memory to contain the whole file:
   buffer = (char*) malloc (sizeof(char)*lSize);
+
+
   if (buffer == NULL) {fputs ("Memory error",stderr); exit (2);}
 
   // copy the file into the buffer:
@@ -119,14 +123,17 @@ if ((bind(mysocket, (struct sockaddr *)&server, sizeof(server))) < 0) // if bind
  
 //format for two logs files is one number per line TA will be using this to grade
 
- FILE * clientseqnum.log,clientack.log;
+
+ FILE * logfile1;
+ FILE * logfile2;
+
  FILE * seqFile;
   long seqSize;
   char * seqbuffer;
   size_t seqresult;
 
-
-
+  logfile1 = fopen ( "clientseqnum.log" , "rb" );
+  logfile2=fopen("clientack.log","rb");
   
 
 /*
@@ -138,80 +145,158 @@ if ((bind(mysocket, (struct sockaddr *)&server, sizeof(server))) < 0) // if bind
 int totalcount=0;
 //keep up with sequence either 0 or 1 to pass to packet
 
-while(totalcount!=lsize){
-char *tempbuf[30];
+while(totalcount!=bufsize){
+char tempbuf[30];
 int loopcount=0;
 for(int i=0;i<30;i++){
 
-  if(buf[totalcount+i]!=0){
+  if(buffer[totalcount+i]!=0){
   loopcount+=1;
-  tempbuf[totalcount+i]=buf[toalcount+i];}
+  tempbuf[totalcount+i]=buffer[totalcount+i];}
   else{
     break;
   }
 
 //check to see if clientseqnum exists if not create it and send packet with 0 seq num first
-  seqFile = fopen ( clientseqnum.log , "rb" );
+  seqFile = fopen ( "clientseqnum.log" , "rb" );
   if (seqFile==NULL) {
-
+  
 
  packet p(1,0,loopcount,tempbuf);
+
+//serialize and then send
+char spacket[30];
+ memset((char *) spacket, 0, bufsize);
+
+p.serialize(spacket);
+
+
+if (sendto(udp_socket, ackData, sizeof(ackData), 0, (struct sockaddr *)&emulatorSend, sizeof(emulatorSend)) == -1)
+        {
+          perror("Sending Error");
+          return -1;
+        }
+
+
+//wait for ack from server
+
+
+    memset(receiveData, 0, sizeof(receiveData));
+    memset(charData, 0, sizeof(charData));
+    memset(ackData, 0, sizeof(ackData));
+
+    // error in receiving from client
+    if (recvfrom(udp_socket, receiveData, sizeof(receiveData), 0, (struct sockaddr *)&client, &clen) == -1)
+    {
+      perror("Receiving\n");
+      return -1;
+    }
+
+
+
+    filepacket.deserialize((char *)receiveData); // deserialize to see sent data
+    type = filepacket.getType();                 //get Type
+    seqnum = filepacket.getSeqNum();
+
+    ackFile << seqnum << "\n";
+    printf("\n--------------------------------------\n");
+    filepacket.printContents();
+
+    printf("\nExpecting Rn: %d\n", expectseq);
+    printf("sn: %d\n", seqnum);
+
+    if (expectseq == seqnum) //  if expected sequence matches sequence number from client file
+    {
+
+      if (filepacket.getType() == 3) // if type sent by client is 3 then do EOT
+      {
+
+        acktype = 2; // set acktype to 2
+        packet ackpacket(acktype, seqnum, 0, 0);
+        ackpacket.serialize(ackData); //searialize to send data
+
+
+
+
+
+
+         
+        ackpacket.printContents(); //print sent data
+        printf("--------------------------------------\n");
+        break; // exit
+      }
+
+      outfile << filepacket.getData(); // write to the file
+
+      packet ackpacket(acktype, seqnum, 0, 0); // send only acktype and seq number
+      ackpacket.serialize((char *)ackData);    // searilize to send data in the socket
+      //send ack to server
+      if (sendto(udp_socket, ackData, sizeof(ackData), 0, (struct sockaddr *)&emulatorSend, sizeof(emulatorSend)) == -1)
+      {
+        printf("Sending Error\n");
+        return -1;
+      }
+
+      ackpacket.printContents();
+      expectseq = (expectseq + 1) % 8;
+    }
+    else // if sequence number doesnot resend the ack to the server
+    {
+      packet ackpacket(acktype, expectseq, 0, 0);
+      ackpacket.serialize((char *)ackData);
+      sendto(udp_socket, ackData, sizeof(ackData), 0, (struct sockaddr *)&emulatorSend, sizeof(emulatorSend));
+      ackpacket.printContents();
+      printf("-------------------------------------\n");
+    }
+  }
+
+  outfile.close(); //close the file
+
+
+
+
+//write seq number to file
+
 
 
   }
   else{
-  //get last integer written to the file
- //some psuedocode  
- //int sequenceinelse=getintlastinfile
+    int sequencebuffer[bufsize];
 
- //if(sequenceinelse==0){
 
-   //packet p( has 1 as sequence when sent)
+    for(int i=1;i<bufsize;i++){
 
-   ...
-   ...
-   ...
-     //create packet and then serialize.
+      if(sequencebuffer[i-1]=0){
+    packet p(1,1,loopcount,tempbuf);
+
+
+    //serialize and then send
+p.serialize(p);
+
+//wait for ack from server
+
+
+//write seq number to file
+
+      }
+      if(sequencebuffer[i-1]=1){
+
+ packet p(1,0,loopcount,tempbuf);
+
+
+
   
 
-//record sequence number
-
-//send the packet then wait for an ack
-
-//if packet is received deserialize
-
-//record ack or EOT in acklog
-
-
- //}
-  //else(packet p has 0 as sequnce when sent)
-
-...
-...
-...
-
-  //create packet and then serialize.
-  
-
-//record sequence number
-
-//send packet then wait for an ack from server
-
-//if packet is received deserialize
-
-//record ack or EOT in acklog
 
   }
-
-
-
-
+  
+  }
 
 
   totalcount+=loopcount;
 }
 
-}
+}}
 
 //send EOT packet to server
 
@@ -271,7 +356,7 @@ EOT packet to the server.  The EOT packet is in the same format
   free (buffer);
 
   close(mysocket); // close the socket
-
+  return 0;
 }
 
 
