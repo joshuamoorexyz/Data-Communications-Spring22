@@ -10,25 +10,9 @@ class packet{
 	
 private:
 	
-    int type;       
-	// 0 if an ACK
-	//1 if a data packet
-	//2 if EOT packet from server to client
-	//3 EOT packet from client to server
-
-	int seqnum;     
-	//either 0 or 1. sequence number of the first packet should be 0
-	//For ACK packets, seqnum is the sequence number of the packet being acknowledge
-
-	int length;    
-	 // number of characters carried in data field 
-	 //should be in the range of 0 to 30 taking the largest chunk of data
-	 //per packet sent (take 30 characters if you can,less if you have reached
-	 //the end of the file) Assume ASCII text file adn that spaces,exclamation points,
-	 //newline symbols,etc each count as a character.
-
-	 //for ACK packets,length should be set to zero and carry no data
-
+    int type;       // 0 if an ACK, 1 if a data packet
+	int seqnum;     // sequence number
+	int length;     // number of characters carried in data field 
 	char * data;    // remember this should be 0 for ACK packets
  
 public:

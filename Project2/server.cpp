@@ -1,157 +1,218 @@
-// Author: Joshua Moore
-// NetID: jjm702
-// Author: Rojal
-// NetID: 
+// Author: Joshua Moore and Rojal Bishwokarma
+// NetID: jjm702 & rb2298
+// Program for Data Communications Spring 2022
+// Description: demonstrate GBN protocol
 
-// Server program for Data Comm Project 2.Spring 2022
 
-#include<iostream>
+//citations: 
+//Maxwell Young emulation-hookup files for majority of structure [canvas]
+//Maxwell Young packet header and cpp [canvas]
+//https://www.cplusplus.com/reference/fstream/ofstream/ [ofstream reference]
+//https://stackoverflow.com/questions/13547721/udp-socket-set-timeout [timer reference]
+//https://www.cplusplus.com/reference/cstring/memset/ [memset] 
+//https://www.geeksforgeeks.org/multidimensional-arrays-c-cpp/ [2d array reference]
+//https://man7.org/linux/man-pages/man2/select.2.html [select reference]
+
+
+
+#include <stdlib.h>
+#include <cstring>
+#include <cstdlib>
+#include <iostream>
 #include <sys/types.h>   // defines types (like size_t)
 #include <sys/socket.h>  // defines socket class
 #include <netinet/in.h>  // defines port numbers for (internet) sockets, some address structures, and constants
-#include <time.h>        // used for random number generation
-#include <string.h> // using this to convert random port integer to string
-#include <arpa/inet.h>
-#include <stdio.h>
+#include <netdb.h> 
+#include <iostream>
+#include <fstream>
+#include <arpa/inet.h>   // if you want to use inet_addr() function
+#include <string.h>
 #include <unistd.h>
 #include "packet.h" // include packet class
-#include <fstream>
+#include <math.h>
 
 using namespace std;
 
 int main(int argc, char *argv[]){
+  int type = 1;
+  int seqnum = 0;
+  int acktype = 0;
+  int expectseq = 0;
+  char receiveData[37]; // to receive from packet
+  char charData[30];    // character in the packet
+  char ackData[42];     // to send ack data to client
+
   
-//setup for writing to file
+	// ******************************************************************
+	// ******************************************************************
+	
+	//get the right number of inputs from the user or end program execution
+	if (argc != 5)
+	{
+		cout<<"Incorrect number of args..exiting ...\n";
+		return 1;
+	}
 
-//overwrite on these files not just append
-
-//open file to read and write to
-ofstream myFile;
-myFile.open(fileName);
-if(myFile.is_open()){
-  perror("open error");
-}
-
-//open file to generate log file.
-ofstream myFile1;
-myFile1.open(arrival.log);
-if(myFile1.is_open()){
-  perror("open error");
-}
+	// ******************************************************************
+	// ******************************************************************
 
 
-  struct sockaddr_in server;
-  struct sockaddr_in client;
-   int packetLen=50;
-  struct hostent *emulatorName;
-  int mysocket = 0;
-  int i = 0;
-  socklen_t clen = sizeof(client);
+	// sets up datagram socket for receiving from emulator
+	int ESSocket = socket(AF_INET, SOCK_DGRAM, 0);  
+	if(ESSocket < 0){
+		cout << "Error: failed to open datagram socket.\n";
+	}
 
-//get command line input from the user
+	// set up the sockaddr_in structure for receiving
+	struct sockaddr_in ES; 
+	socklen_t ES_length = sizeof(ES);
+	bzero(&ES, sizeof(ES)); 
+	ES.sin_family = AF_INET;	
+	ES.sin_addr.s_addr = htonl(INADDR_ANY);	
+	char * end;
+	int sr_rec_port = strtol(argv[2], &end, 10);  // server's receiving port and convert to int
+	ES.sin_port = htons(sr_rec_port);             // set to emulator's receiving port
+		
+	// do the binding
+	if (bind(ESSocket, (struct sockaddr *)&ES, ES_length) == -1)
+		cout << "Error in binding.\n";		
+		
+	// ******************************************************************
+	// ******************************************************************
+	
+	// declare and setup server
+	struct hostent *em_host;            // pointer to a structure of type hostent
+	em_host = gethostbyname(argv[1]);   // host name for emulator
+	
+	if(em_host == NULL){                // failed to obtain server's name
+		cout << "Failed to obtain server.\n";
+		exit(EXIT_FAILURE);
+	}
 
-//emulatorName: host address of the emulator
-  emulatorName = gethostbyname(argv[1]);
-  
-//sendToEmulator: UDP port number used by the emulator to receive 
-//data from the client
-int sendToEmulator=atoi(argv[2]);
-if(sendToEmulator < 1024 || sendToEmulator > 65355){
-  cout<<"Invalid port number";
-  cout<<endl;
-  return -1;
-}
+	int SESocket = socket(AF_INET, SOCK_DGRAM, 0);
+	if(SESocket < 0){
+		cout << "Error in trying to open datagram socket.\n";
+		exit(EXIT_FAILURE);
+	}
+		
+	// setup sockaddr_in struct  
+	struct sockaddr_in SE;	
+	memset((char *) &SE, 0, sizeof(SE));
+	SE.sin_family = AF_INET;
+	bcopy((char *)em_host->h_addr, (char*)&SE.sin_addr.s_addr, em_host->h_length);
+	int em_rec_port = strtol(argv[3], &end, 10);
+	SE.sin_port = htons(em_rec_port);
+	
 
-//receiveFromEmulator: UDP port number used by the client to 
-//recieve ACKS from the emulator
-int receiveFromEmulator=atoi(argv[3]);
-if(receiveFromEmulator < 1024 || receiveFromEmulator > 65355){
-  cout<<"Invalid port number";
-  cout<<endl;
-  return -1;
-}
-
-//fileName: name of the file to be transferred in the given order
-char* fileName=argv[4];
-
-
-
-  char payload[512];
-  memset(payload, 0, 512);
-  char serialized[512];
-  memset(serialized, 0, 512); 
-  
-
-
-
-  if ((mysocket=socket(AF_INET, SOCK_DGRAM, 0))==-1)
-    cout << "Error in socket creation.\n";
-  
-  memset((char *) &server, 0, sizeof(server));
-  server.sin_family = AF_INET;
-  server.sin_port = htons(7123);
-  server.sin_addr.s_addr = htonl(INADDR_ANY);
-
-
-  if (bind(mysocket, (struct sockaddr *)&server, sizeof(server)) == -1)
-    cout << "Error in binding.\n";
-  
-  char ack[]="Got all that data, thanks!";
-  
+	
+	// ******************************************************************
+	// ******************************************************************
 
 
-//recieve packets
-  packet rcvdPacket(0,0,0,payload);
-  for (i=0; i<2; i++) { // loop is redundant
-    if (recvfrom(mysocket, serialized, 512, 0, (struct sockaddr *)&client, &clen)==-1)
-      cout << "Failed to receive.\n";
-    else{
+//setup files to write to
+  ofstream outfile;
+  outfile.open(argv[4]); // opens a file
+  if (!outfile.is_open())
+  {
+    cout<<"Could not open file to write to\n";
+	return 1;
+  }
+
+  // ack file 
+  ofstream ackFile;
+  ackFile.open("arrival.log");
+
+  if (!ackFile.is_open())
+  {
+     cout<<"Could not open file to write to\n";
+	return 1;
+  }
+
+  packet filepacket(type, seqnum, sizeof(charData), charData);
 
 
-     /*
 
-      if packet is received from the client then
-
-      check the sequence number of the packet
-
-      if the sequence number is the one that it is expecting,
-      it should send an ACK packet back to the client with the
-      sequence number of the received packet
-
-      In all other cases,it should discard the received packet
-      and resend an ACK packet for the most recently received in
-      order packet
+	// ******************************************************************
+	// ******************************************************************
 
 
-      after the server has received all data packets and an 
-      EOT from the client, it should send an EOT packet with the type
-      field set to 2, and then exit.
+	//start loop de encapsulation
 
-      the server must also write the received data from the client to
-      the file fileName
+  while (1)
+  {
+	//set all to 0
+    memset(receiveData, 0, sizeof(receiveData));
+    memset(charData, 0, sizeof(charData));
+    memset(ackData, 0, sizeof(ackData));
 
-      write to log file,the sequence numbers of all the data
-      packets and the EOT packet that the server receives during transmission
+    // error in receiving from client
+    if (recvfrom(ESSocket, receiveData, sizeof(receiveData), 0, (struct sockaddr *)&ES, &ES_length) == -1)
+    {
+      perror("Receiving\n");
+      return -1;
+    }
 
+    filepacket.deserialize((char *)receiveData); // deserialize to see sent data
+    type = filepacket.getType();                 //get Type
+    seqnum = filepacket.getSeqNum();
+	//write to ack file
+    ackFile << seqnum << "\n";
+    
+	cout<<endl;
 
-      */
+  	//  if the seq num matches
 
-   cout << "Received packet and deserialized to obtain the following: " << endl << endl;
-    rcvdPacket.deserialize(serialized);	
-    rcvdPacket.printContents();
+    if (expectseq == seqnum) 
+    {
+	//  EOT
+      if (filepacket.getType() == 3) 
+      {
+		// set acktype to 2
+        acktype = 2; 
+        packet ackpacket(acktype, seqnum, 0, 0);
+        ackpacket.serialize(ackData); 
 
+		//send to client via emulator
+        if (sendto(SESocket, ackData, sizeof(ackData), 0, (struct sockaddr *)&SE, sizeof(SE)) == -1)
+        {
+          perror("error sending");
+          return 1;
+        }
+       	cout<<endl;
 
+        break; 
+      }
+		//put data into file
+      outfile << filepacket.getData(); 
+	  
+	  
+      packet ackpacket(acktype, seqnum, 0, 0); 
+      ackpacket.serialize((char *)ackData);    
+
+      //send ack to client via emulator
+      if (sendto(SESocket, ackData, sizeof(ackData), 0, (struct sockaddr *)&SE, sizeof(SE)) == -1)
+      {
+        perror("error sending");
+          return 1;
       }
 
- 
-
+	  //update seqnum
+      expectseq = (expectseq + 1) % 8;
     }
-	
-  
+    else 
+    {
+      packet ackpacket(acktype, expectseq, 0, 0);
+      ackpacket.serialize((char *)ackData);
+      sendto(SESocket, ackData, sizeof(ackData), 0, (struct sockaddr *)&SE, sizeof(SE));
+     
+    }
   }
-  
-  cout << "La la la I'm still running, but will now shut down.\n";
-  
-  close(mysocket);
-  return 0;
+
+
+
+  //close file and sockets
+
+
+  outfile.close(); 
+  close(SESocket); 
 }

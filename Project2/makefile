@@ -7,4 +7,4 @@ server: server.o
 	g++ server.cpp packet.cpp -o server	
 	
 clean:
-	\rm *.o client server
+	\rm client server output.txt arrival.log clientack.log clientseqnum.log
